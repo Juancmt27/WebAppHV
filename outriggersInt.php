@@ -64,12 +64,6 @@ function HVinst(chan,node,buttonId) {
 </script>
 </head>
 <body>
-        <div id="txtHint">
-
-        </div>
-	<div id="txtData">
-
-	</div>
 <h1 style="text-align:center">HAWC Outriggers Control</h1>
 <div style="text-align:center; padding-bottom: 1cm">
 <?php
@@ -77,7 +71,13 @@ echo "Last Update" . "<br>";
 echo gmdate("d/m/Y") . " " . gmdate("H:i:s") . " " .  "UTC" . "<br>";	
 date_default_timezone_set("America/Mexico");
 echo date("d/m/Y") . " " . date("H:i:s") . " " . "MX" . "<br>";
-
+?>
+<div id="txtData">
+<p>Server State Coments: </p>
+</div>
+<div id="txtHint">
+</div>
+<?php
 chmod("/home/solidbit/public_html/HVmon.c", 0755);  //<<<<<Important!>>>>>   Change this path to the actual HVmon.c
 chmod("/home/solidbit/public_html/HVcontrol.c", 0755); //<<<<<Important!>>>>>  Change this path to the actual HVcontrol.c
 
