@@ -13,7 +13,11 @@
 #include <errno.h>
 #include <argp.h>
 
+
+
+
 /* Initialize argument parser */
+
 
 /* Program Description. */
 static char doc[] =
@@ -23,9 +27,11 @@ static char doc[] =
 
 /* List of possible arguments */
 static struct argp_option options[] = {
+  {"ip",'p',"char",0,"IP address of device to interface with"},
   {"slot",'s',"int",0,"Slot in crate to interface with (0-3)"},
   {"channel",'c',"int",0,"Channel to turn on (0-11)"},
   {"voltage", 'v', "double",0,"Turn on the channel with specified voltage (V)"},
+  {"turnon", 'o', 0,0, "Turn off the channel"},
   {"current",'I', "double",0, "Set the channel current limit (microAmps)"},
   {"turnoff",'t',0,0,"Turn off the channel"},
   {"vfile",'f', "FILE", 0, "ASCII file of channels and voltages (tab delimited)"},
@@ -36,13 +42,14 @@ static struct argp_option options[] = {
 
 
 struct arguments
-{
+{ 
+  char *ip;
   int slot;
   const char *vfile, *Ifile;
   double voltage;
   double current;
   int channel;
-  int turnoff, slotoff;
+  int turnoff, turnon,  slotoff;
 };
 
 
@@ -54,6 +61,9 @@ parse_opt (int key, char *arg, struct argp_state *state)
 
   switch (key)
     {
+    case 'p':
+      arguments->ip = arg;
+      break;
     case 's':
       arguments->slot = atoi(arg);
       break;
@@ -75,6 +85,8 @@ parse_opt (int key, char *arg, struct argp_state *state)
     case 't':
       arguments->turnoff = 1;
       break;
+    case 'o':
+      arguments->turnon = 1;
     case 'k':
       arguments->slotoff = 1;
       break;
@@ -89,15 +101,17 @@ int main(int argc, char **argv)
   struct arguments arguments;
 
   /* Default values. */
+  arguments.ip="192.168.42.181";
   arguments.slot=-1;
   arguments.vfile = NULL;
   arguments.Ifile = NULL;
   arguments.channel=-2;
   arguments.voltage= -1;
   arguments.current= -1;
+  arguments.turnon=0;
   arguments.turnoff= 0;
   arguments.slotoff=0;
-  
+   
   /* Parse given arguments and print to check them */
   argp_parse (&argp, argc, argv, 0, 0, &arguments);
 
@@ -113,13 +127,16 @@ int main(int argc, char **argv)
         int LinkType = 0;		       	
 	
 	/*Login credentials and other system paramters */
-	char *Arg = "192.168.42.181";	      
+	char *Arg = arguments.ip;
+	//char *Arg = "192.168.42.181";	      
 	const char *UserName = "admin";	
 	const char *Passwd = "admin";
 	int handle; //keeps track of current login session
 	
 	/*Begin interfacing with the supply */
-	unsigned short nslot;
+	
+	//Exit if no supply is found
+		unsigned short nslot;
 	short unsigned *nchannels=NULL;
 	char *modelist=NULL;
 	char *descrlist=NULL;
@@ -128,37 +145,39 @@ int main(int argc, char **argv)
 	unsigned char *fmwmax=NULL;
 
 	/* Function to get basic information about the supply */
+
+	
 	
      
 	/* Declare pointers for commands */
  
 	unsigned short Slot, ChNum, *ChList;
-	int *turnonlist;
+	int *turnonlist, *turnofflist;
 	float *VList, *IList;
 	
 	
 	/* Exit and print warning if no slot or nonexistent slot is specified
 	   or contradictory command line args are given */
-
+	
 	if(arguments.slot<0 || arguments.slot>3){
 	  printf("Please specify a slot (0, 1, 2, or 3)\n");
 	  exit(0);
 	}
-//	else if(arguments.channel<0 && arguments.slot>-1 && arguments.slotoff<1){
-//	  printf("Not enough arguments\n");
-//	  exit(0);
-//	}
+	if(arguments.channel<0 && arguments.slot>-1 && arguments.slotoff<1 && arguments.turnon<1){
+	  printf("Not enough arguments\n");
+	  exit(0);
+	}
 	
-	else if(arguments.channel>-1 && arguments.vfile!=NULL || arguments.channel>-1 && arguments.Ifile!=NULL){
+	if(arguments.channel>-1 && arguments.vfile!=NULL || arguments.channel>-1 && arguments.Ifile!=NULL || arguments.turnon>0 && arguments.turnoff>0){
 	  printf("Too many command line arguments given\n");
 	  exit(0);
 	}
 
-//	else if(arguments.channel>-1 && arguments.voltage<0 && arguments.current<0){
-//	  printf("Please specify a turn on voltage or trip current for channel%i\n",arguments.channel);
-//	  exit(0);
-//	}
-	else if(arguments.channel<0 && arguments.voltage>0 || arguments.channel<0 && arguments.current>0){
+	if(arguments.channel>-1 && arguments.voltage<0 && arguments.current<0 && arguments.turnoff<1 && arguments.turnon<1){
+	  printf("Please specify an action for channel%i\n",arguments.channel);
+	  exit(0);
+	}
+	if(arguments.channel<0 && arguments.voltage>0 || arguments.channel<0 && arguments.current>0){
 	  printf("No channel specifed\n");
 	  exit(0);
 	    }
@@ -225,8 +244,7 @@ int main(int argc, char **argv)
 	       ChList[0]=channels[i];
 	       turnonlist[0]=1;
 	       VList[0]=voltages[i];
-	       
-     
+	          
 	       //set channel voltages and throw an alert if failure occures
 	       
 	       printf("Ch%i set to %f\n",ChList[0],VList[0]);
@@ -300,8 +318,6 @@ int main(int argc, char **argv)
 	       IList[0]=currents[i];
 	       
 	       //set channel trip currents and throw an alert if failure occures
-	       
-	       printf("Ch%i set to trip at %f\n",ChList[0],IList[0]);
 
 	       //free allocated memory
 	       free(ChList);
@@ -314,7 +330,7 @@ int main(int argc, char **argv)
 	   // Interface with only the given channel if no files specified
 
 	   if(-1<arguments.channel && arguments.channel<12){
-	     printf("Channel is %i\n",arguments.channel);
+	     //printf("Channel is %i\n",arguments.channel);
 	     ChNum = 1; //how many channels you want read
      	  
 	     //Turn off specified channel
@@ -323,28 +339,43 @@ int main(int argc, char **argv)
 	       // initialize arrays 
 	       ChList=malloc(ChNum*sizeof(unsigned short));
 	       
-	       turnonlist = malloc(ChNum * sizeof(unsigned int));
+	       turnofflist = malloc(ChNum * sizeof(unsigned int));
 	       VList=malloc(ChNum * sizeof(float));  
 	  
 	       ChList[0]=arguments.channel;
-	       turnonlist[0]=0; //0 means off
+	       turnofflist[0]=0; //0 means off
 	       
 	       //Pass turn off command to supply
 	       printf("Killing channel %i in slot %i\n",ChList[0],Slot);
 	  
 	       free(ChList);
 	       
-	       free(turnonlist);
+	       free(turnofflist);
 	       free(VList);
 	   
 	     }
+             else if (arguments.turnon>0){
+		// initialize arrays
+		ChList=malloc(ChNum*sizeof(unsigned short));
+		turnonlist = malloc(ChNum * sizeof(unsigned int));
+		VList=malloc(ChNum * sizeof(float));
+                 
+		ChList[0]=arguments.channel;
+		turnonlist[0]=1;
+		turnonlist= malloc(ChNum * sizeof(unsigned int));
+               	printf("Turning on channel %i in slot %i\n",ChList[0],Slot);
 
-	     else if(arguments.voltage>0){
+                free(ChList);
+
+                free(turnonlist);
+                free(VList);
+		}	 
+	     if(arguments.voltage>0){
 	       
 	       //Initialize arrays of parameters
 	       ChList = malloc(ChNum*sizeof(unsigned short));
 	       
-	       turnonlist = malloc(ChNum * sizeof(unsigned int));
+	       //turnonlist = malloc(ChNum * sizeof(unsigned int));
 	  
 	       VList=malloc(ChNum * sizeof(float));                             	  
 	       ChList[0]=arguments.channel;
@@ -353,11 +384,12 @@ int main(int argc, char **argv)
 	       VList[0]=arguments.voltage;
 	       
 	       //Turn on the channel
-	       printf("Slot = %i\n",Slot);
+	       //CAENHV_SetChParam(handle,Slot,"Pw",ChNum,ChList, turnonlist);
+	       //printf("Slot = %i\n",Slot);
 	       printf("Chan%i V0Set = %f \n",ChList[0],VList[0]);
 	       
 	       //Set the high voltage for the turned on channel
-	       //CAENHV_GetChParam(handle,Slot,"V0Set",ChNum,ChList, fParValList);     
+	       
 	       //Free the allocated memory
 	       free(ChList);
 	      
@@ -377,6 +409,7 @@ int main(int argc, char **argv)
 	       printf("Chan%i I0Set = %f \n",ChList[0],IList[0]);
 	       
 	       //Set the max current for the turned on channel
+	 	       
 	       //Free the allocated memory
 	       free(ChList);
 	      
@@ -416,7 +449,7 @@ int main(int argc, char **argv)
 	
 	//Disconnect from supply
 
+
 	return 0;
 
 }
-
